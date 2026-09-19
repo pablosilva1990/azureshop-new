@@ -7,7 +7,7 @@ variable "subscription_id" {
 variable "location" {
   description = "Regiao Azure onde todos os recursos serao criados."
   type        = string
-  default     = "brazilsouth"
+  default     = "westus3"
 }
 
 variable "suffix" {

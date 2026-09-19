@@ -39,7 +39,7 @@ variables:
 
   # Sufixo curto e unico usado nos nomes globais (ACR, SQL, Key Vault, App).
   suffix: 'shop01'
-  location: 'brazilsouth'
+  location: 'westus3'
 
   terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)/infra/terraform/appservice'
   terraformVersion: '1.9.5'

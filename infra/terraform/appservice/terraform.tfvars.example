@@ -5,7 +5,7 @@
 # NUNCA versione terraform.tfvars, planos ou state.
 
 suffix   = "shop01"
-location = "brazilsouth"
+location = "westus3"
 
 acr_sku         = "Basic"
 app_service_sku = "B1"

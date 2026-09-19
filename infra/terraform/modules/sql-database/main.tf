@@ -49,6 +49,16 @@ variable "public_network_access" {
   type    = bool
   default = true
 }
+variable "min_capacity" {
+  description = "vCores minimos para SKUs serverless (GP_S_*). Obrigatorio nesses SKUs; ignorado nos demais."
+  type        = number
+  default     = 0.5
+}
+variable "auto_pause_delay_in_minutes" {
+  description = "Minutos de ociosidade antes de pausar um banco serverless (GP_S_*). -1 desativa o auto-pause."
+  type        = number
+  default     = 60
+}
 
 locals {
   sql_region = var.sql_location != "" ? var.sql_location : var.location
@@ -81,6 +91,10 @@ resource "azurerm_mssql_database" "this" {
   collation   = "SQL_Latin1_General_CP1_CI_AS"
   max_size_gb = 2
   tags        = var.tags
+
+  # SKUs serverless (GP_S_*) exigem min_capacity/auto_pause_delay_in_minutes explicitos.
+  min_capacity                = startswith(var.sku_name, "GP_S_") ? var.min_capacity : null
+  auto_pause_delay_in_minutes = startswith(var.sku_name, "GP_S_") ? var.auto_pause_delay_in_minutes : null
 }
 
 # Regra temporaria para o IP do instrutor (apenas durante o laboratorio).
