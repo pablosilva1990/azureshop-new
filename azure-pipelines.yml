@@ -45,6 +45,9 @@ variables:
   # preso em soft-delete com purge protection ate 2026-09-26 e nao pode ser reusado ate la.
   keyVaultName: 'kv-azshop2-shop01'
 
+  # Deve bater com var.sql_admin_login (terraform/appservice/variables.tf).
+  sqlAdminLogin: 'azureshopadmin'
+
   terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)/infra/terraform/appservice'
   terraformVersion: '1.9.5'
 
@@ -179,8 +182,32 @@ stages:
               echo "##vso[task.setvariable variable=appServiceName;isOutput=true]$(terraform output -raw app_service_name)"
               echo "##vso[task.setvariable variable=resourceGroupName;isOutput=true]$(terraform output -raw resource_group_name)"
               echo "##vso[task.setvariable variable=appServiceUrl;isOutput=true]$(terraform output -raw app_service_url)"
+              echo "##vso[task.setvariable variable=sqlServerFqdn;isOutput=true]$(terraform output -raw sql_server_fqdn)"
+              echo "##vso[task.setvariable variable=sqlDatabaseName;isOutput=true]$(terraform output -raw sql_database_name)"
             name: tfOutputs
             displayName: 'Publicar outputs do Terraform'
+
+          - task: AzureCLI@2
+            displayName: 'Aplicar schema do Azure SQL'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+
+                if ! command -v sqlcmd >/dev/null 2>&1; then
+                  curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+                  curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list >/dev/null
+                  sudo apt-get update -y
+                  sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+                fi
+                export PATH="$PATH:/opt/mssql-tools18/bin"
+
+                sqlPassword=$(az keyvault secret show --vault-name "$(keyVaultName)" --name sql-admin-password --query value -o tsv)
+
+                sqlcmd -S "$(sqlServerFqdn)" -d "$(sqlDatabaseName)" -U "$(sqlAdminLogin)" -P "$sqlPassword" -C \
+                  -i "$(System.DefaultWorkingDirectory)/infra/sql/schema.sql"
 
   - stage: BuildAndPush
     displayName: 'Build da imagem (ACR Tasks)'
