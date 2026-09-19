@@ -1,0 +1,26 @@
+# Stack self-contained: cria TODOS os recursos (RG, ACR, App Service, Azure SQL,
+# Key Vault, Application Insights). Nao depende de recursos criados manualmente
+# no Portal. Copie para terraform.tfvars local para uso manual; a pipeline do
+# Azure DevOps injeta estas variaveis via TF_VAR_* e nao precisa deste arquivo.
+# NUNCA versione terraform.tfvars, planos ou state.
+
+suffix   = "shop01"
+location = "brazilsouth"
+
+acr_sku         = "Basic"
+app_service_sku = "B1"
+
+sql_admin_login   = "azureshopadmin"
+sql_database_name = "azureshop"
+sql_sku_name      = "GP_S_Gen5_1"
+
+# Necessario porque o App Service deste stack nao usa VNet Integration.
+allow_azure_services = true
+allowed_source_ip    = ""
+
+docker_image_name = "azureshop"
+docker_image_tag  = "latest"
+
+# Object ID do Service Principal do service connection do Azure DevOps.
+# Obtenha com: az ad sp show --id <appId> --query id -o tsv
+pipeline_service_principal_object_id = ""
