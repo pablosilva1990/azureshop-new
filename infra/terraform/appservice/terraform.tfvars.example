@@ -21,6 +21,6 @@ allowed_source_ip    = ""
 docker_image_name = "azureshop"
 docker_image_tag  = "latest"
 
-# Object ID do Service Principal do service connection do Azure DevOps.
-# Obtenha com: az ad sp show --id <appId> --query id -o tsv
+# Object ID do Service Principal 'DEvops-Estudos' usado pelo service connection do Azure DevOps.
+# Obtenha com: az ad sp list --display-name "DEvops-Estudos" --query "[0].id" -o tsv
 pipeline_service_principal_object_id = ""
