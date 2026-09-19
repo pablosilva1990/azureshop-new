@@ -8,6 +8,7 @@ const { normalizeCustomerSessionId } = require('./orders');
 
 function createApp(repository) {
   const app = express();
+  app.set('trust proxy', 1); // correto detecção de protocolo/IP atrás do proxy do App Service
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(express.json({ limit: '100kb' }));
   app.use(express.static(path.resolve(__dirname, '../public')));
