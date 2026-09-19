@@ -26,6 +26,12 @@ variable "resource_group_name" {
   default     = ""
 }
 
+variable "key_vault_name" {
+  description = "Nome explicito do Key Vault. Use para evitar colisao com um vault soft-deleted anterior (nomes de Key Vault sao globais). Se vazio, usa kv-azshop-<suffix>."
+  type        = string
+  default     = ""
+}
+
 variable "acr_sku" {
   type    = string
   default = "Basic"

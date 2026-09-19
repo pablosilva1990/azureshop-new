@@ -3,7 +3,7 @@ locals {
   resource_group_name = var.resource_group_name != "" ? var.resource_group_name : "rg-azureshop-${var.suffix}"
   acr_name            = "acrazureshop${var.suffix}"
   sql_server_name     = "sql-azureshop-${var.suffix}"
-  key_vault_name      = "kv-azshop-${var.suffix}"
+  key_vault_name      = var.key_vault_name != "" ? var.key_vault_name : "kv-azshop-${var.suffix}"
   app_name            = "app-azureshop-${var.suffix}"
   monitoring_name     = "azureshop-${var.suffix}"
 }
