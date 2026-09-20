@@ -79,7 +79,13 @@ variable "sql_admin_login" {
 variable "allow_azure_services" {
   description = "Libera 0.0.0.0 no firewall do SQL para que o AKS (sem VNet integration com o SQL) alcance o banco."
   type        = bool
-  default     = true
+  default     = false
+}
+
+variable "sql_public_network_access" {
+  description = "Mantem o acesso publico ao Azure SQL habilitado. Para uso via Private Endpoint, mantenha false."
+  type        = bool
+  default     = false
 }
 
 variable "key_vault_name" {

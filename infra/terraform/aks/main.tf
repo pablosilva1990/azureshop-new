@@ -54,7 +54,8 @@ module "sql_database" {
   admin_login         = var.sql_admin_login
   admin_password      = random_password.sql_admin.result
 
-  allow_azure_services = var.allow_azure_services
+  allow_azure_services  = var.allow_azure_services
+  public_network_access = var.sql_public_network_access
 }
 
 module "monitoring" {

@@ -21,4 +21,5 @@ sql_server_name    = "" # vazio = sql-azureshop-<suffix>
 sql_database_name  = "azureshop"
 sql_sku_name       = "GP_S_Gen5_1"
 sql_admin_login    = "azureshopadmin"
-allow_azure_services = true
+allow_azure_services  = false
+sql_public_network_access = false
