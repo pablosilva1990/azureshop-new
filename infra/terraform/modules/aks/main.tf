@@ -41,9 +41,10 @@ resource "azurerm_kubernetes_cluster" "this" {
   azure_policy_enabled              = var.azure_policy_enabled
 
   default_node_pool {
-    name       = "system"
-    node_count = var.node_count
-    vm_size    = var.node_size
+    name                        = "system"
+    node_count                  = var.node_count
+    vm_size                     = var.node_size
+    temporary_name_for_rotation = "temp"
     # Uma zona apenas para reduzir custo em laboratorio.
   }
 
