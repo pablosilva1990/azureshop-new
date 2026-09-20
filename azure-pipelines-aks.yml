@@ -39,10 +39,11 @@ variables:
   # Recursos existentes (criados pelo stack App Service) reaproveitados aqui.
   sharedResourceGroupName: 'rg-azureshop-shop01'
   acrName: 'acrazureshopshop01'
-  sqlServerName: 'sql-azureshop-shop01'
+  keyVaultName: 'kv-azshop2-shop01'
+
+  # Azure SQL dedicado ao AKS (criado por este stack; o servidor do App Service foi excluido).
   sqlDatabaseName: 'azureshop'
   sqlAdminLogin: 'azureshopadmin'
-  keyVaultName: 'kv-azshop2-shop01'
 
   terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)/infra/terraform/aks'
   terraformVersion: '1.9.5'
@@ -147,7 +148,6 @@ stages:
                 -var="location=$(location)"
                 -var="shared_resource_group_name=$(sharedResourceGroupName)"
                 -var="acr_name=$(acrName)"
-                -var="sql_server_name=$(sqlServerName)"
                 -var="sql_database_name=$(sqlDatabaseName)"
                 -var="sql_admin_login=$(sqlAdminLogin)"
                 -var="key_vault_name=$(keyVaultName)"
@@ -164,7 +164,7 @@ stages:
 
           - task: AzureCLI@2
             name: tfOutputs
-            displayName: 'Publicar outputs do Terraform'
+            displayName: 'Publicar outputs do Terraform e aplicar schema do Azure SQL'
             inputs:
               azureSubscription: '$(azureServiceConnection)'
               scriptType: bash
@@ -178,12 +178,29 @@ stages:
                 acrLoginServer=$(terraform output -raw acr_login_server)
                 keyVaultSecretsProviderClientId=$(terraform output -raw key_vault_secrets_provider_client_id)
                 tenantId=$(terraform output -raw tenant_id)
+                sqlServerFqdn=$(terraform output -raw sql_server_fqdn)
+                sqlDatabaseNameOut=$(terraform output -raw sql_database_name)
 
                 echo "##vso[task.setvariable variable=aksName;isOutput=true]$aksName"
                 echo "##vso[task.setvariable variable=aksResourceGroupName;isOutput=true]$aksResourceGroupName"
                 echo "##vso[task.setvariable variable=acrLoginServer;isOutput=true]$acrLoginServer"
                 echo "##vso[task.setvariable variable=keyVaultSecretsProviderClientId;isOutput=true]$keyVaultSecretsProviderClientId"
                 echo "##vso[task.setvariable variable=tenantId;isOutput=true]$tenantId"
+
+                # Variaveis de shell locais (nao macros $(...) do Pipelines) evitam que o
+                # bash tente executa-las como command substitution antes da expansao do Azure DevOps.
+                if ! command -v sqlcmd >/dev/null 2>&1; then
+                  curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+                  curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list >/dev/null
+                  sudo apt-get update -y
+                  sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+                fi
+                export PATH="$PATH:/opt/mssql-tools18/bin"
+
+                sqlPassword=$(az keyvault secret show --vault-name "$(keyVaultName)" --name sql-password --query value -o tsv)
+
+                sqlcmd -S "$sqlServerFqdn" -d "$sqlDatabaseNameOut" -U "$(sqlAdminLogin)" -P "$sqlPassword" -C \
+                  -i "$(System.DefaultWorkingDirectory)/infra/sql/schema.sql"
 
   - stage: BuildAndPush
     displayName: 'Build da imagem (ACR Tasks)'

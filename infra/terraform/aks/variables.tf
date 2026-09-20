@@ -54,9 +54,9 @@ variable "acr_name" {
 }
 
 variable "sql_server_name" {
-  description = "Nome do Azure SQL Server existente (sem o sufixo .database.windows.net)."
+  description = "Nome do Azure SQL Server dedicado ao AKS, criado por este stack."
   type        = string
-  default     = "sql-azureshop-shop01"
+  default     = ""
 }
 
 variable "sql_database_name" {
@@ -64,10 +64,22 @@ variable "sql_database_name" {
   default = "azureshop"
 }
 
+variable "sql_sku_name" {
+  description = "SKU do banco Azure SQL dedicado ao AKS (serverless barato: GP_S_Gen5_1)."
+  type        = string
+  default     = "GP_S_Gen5_1"
+}
+
 variable "sql_admin_login" {
-  description = "Login administrativo do Azure SQL existente. Deve bater com o do stack App Service."
+  description = "Login administrativo do Azure SQL dedicado ao AKS."
   type        = string
   default     = "azureshopadmin"
+}
+
+variable "allow_azure_services" {
+  description = "Libera 0.0.0.0 no firewall do SQL para que o AKS (sem VNet integration com o SQL) alcance o banco."
+  type        = bool
+  default     = true
 }
 
 variable "key_vault_name" {

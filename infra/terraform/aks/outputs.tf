@@ -38,3 +38,11 @@ output "tenant_id" {
 output "oidc_issuer_url" {
   value = module.aks.oidc_issuer_url
 }
+
+output "sql_server_fqdn" {
+  value = module.sql_database.server_fqdn
+}
+
+output "sql_database_name" {
+  value = module.sql_database.database_name
+}

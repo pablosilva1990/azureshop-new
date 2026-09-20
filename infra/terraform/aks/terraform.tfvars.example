@@ -1,9 +1,9 @@
 # Stack self-contained para publicar a mesma aplicacao AzureShop em um AKS,
 # rodando EM PARALELO ao stack App Service (infra/terraform/appservice).
-# Reaproveita ACR, Azure SQL e Key Vault ja criados por aquele stack (via data
-# source) e cria apenas os recursos novos do AKS. Copie para terraform.tfvars
-# local para uso manual; a pipeline injeta via TF_VAR_* e nao precisa deste arquivo.
-# NUNCA versione terraform.tfvars, planos ou state.
+# Reaproveita ACR e Key Vault ja criados por aquele stack (via data source),
+# mas cria um Azure SQL DEDICADO ao AKS (o servidor do App Service foi excluido).
+# Copie para terraform.tfvars local para uso manual; a pipeline injeta via
+# TF_VAR_* e nao precisa deste arquivo. NUNCA versione terraform.tfvars, planos ou state.
 
 suffix   = "aks01"
 location = "westus3"
@@ -14,7 +14,11 @@ aks_node_size  = "Standard_D2s_v5"
 # Recursos existentes do stack App Service, reaproveitados via data source.
 shared_resource_group_name = "rg-azureshop-shop01"
 acr_name                   = "acrazureshopshop01"
-sql_server_name            = "sql-azureshop-shop01"
-sql_database_name          = "azureshop"
-sql_admin_login            = "azureshopadmin"
 key_vault_name             = "kv-azshop2-shop01"
+
+# Azure SQL dedicado ao AKS (criado por este stack).
+sql_server_name    = "" # vazio = sql-azureshop-<suffix>
+sql_database_name  = "azureshop"
+sql_sku_name       = "GP_S_Gen5_1"
+sql_admin_login    = "azureshopadmin"
+allow_azure_services = true

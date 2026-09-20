@@ -3,6 +3,7 @@ locals {
   resource_group_name = var.resource_group_name != "" ? var.resource_group_name : "rg-azureshop-aks-${var.suffix}"
   aks_name            = "aks-azureshop-${var.suffix}"
   monitoring_name     = "azureshop-aks-${var.suffix}"
+  sql_server_name     = var.sql_server_name != "" ? var.sql_server_name : "sql-azureshop-${var.suffix}"
 }
 
 data "azurerm_client_config" "current" {}
@@ -18,25 +19,9 @@ data "azurerm_container_registry" "shared" {
   resource_group_name = data.azurerm_resource_group.shared.name
 }
 
-data "azurerm_mssql_server" "shared" {
-  name                = var.sql_server_name
-  resource_group_name = data.azurerm_resource_group.shared.name
-}
-
-data "azurerm_mssql_database" "shared" {
-  name      = var.sql_database_name
-  server_id = data.azurerm_mssql_server.shared.id
-}
-
 data "azurerm_key_vault" "shared" {
   name                = var.key_vault_name
   resource_group_name = data.azurerm_resource_group.shared.name
-}
-
-# Senha ja gerada e armazenada pelo stack App Service; nunca versionada em texto claro aqui.
-data "azurerm_key_vault_secret" "sql_admin_password" {
-  name         = "sql-admin-password"
-  key_vault_id = data.azurerm_key_vault.shared.id
 }
 
 # --- Recursos novos deste stack ---
@@ -45,6 +30,31 @@ resource "azurerm_resource_group" "this" {
   name     = local.resource_group_name
   location = var.location
   tags     = local.tags
+}
+
+# Azure SQL dedicado ao AKS (o servidor original do App Service foi excluido).
+resource "random_password" "sql_admin" {
+  length           = 24
+  special          = true
+  min_lower        = 1
+  min_upper        = 1
+  min_numeric      = 1
+  min_special      = 1
+  override_special = "-_=+"
+}
+
+module "sql_database" {
+  source              = "../modules/sql-database"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  tags                = local.tags
+  server_name         = local.sql_server_name
+  database_name       = var.sql_database_name
+  sku_name            = var.sql_sku_name
+  admin_login         = var.sql_admin_login
+  admin_password      = random_password.sql_admin.result
+
+  allow_azure_services = var.allow_azure_services
 }
 
 module "monitoring" {
@@ -82,22 +92,32 @@ resource "azurerm_role_assignment" "aks_kv_secrets_user" {
   principal_id         = module.aks.key_vault_secrets_provider_object_id
 }
 
+# Deployer precisa gerenciar secrets para gravar as credenciais do novo SQL no Key Vault.
+resource "azurerm_role_assignment" "deployer_kv_secrets_officer" {
+  scope                = data.azurerm_key_vault.shared.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Espelha no Key Vault compartilhado os valores no formato esperado pelo
-# SecretProviderClass (infra/k8s/secretproviderclass.yaml). O valor da senha e
-# lido do secret ja existente, nunca reescrito em texto claro no state deste
-# stack alem da referencia ao data source acima (Terraform trata como sensitive).
+# SecretProviderClass (infra/k8s/secretproviderclass.yaml), apontando para o
+# Azure SQL dedicado do AKS.
 resource "azurerm_key_vault_secret" "sql_server" {
   name         = "sql-server"
-  value        = data.azurerm_mssql_server.shared.fully_qualified_domain_name
+  value        = module.sql_database.server_fqdn
   key_vault_id = data.azurerm_key_vault.shared.id
   tags         = local.tags
+
+  depends_on = [azurerm_role_assignment.deployer_kv_secrets_officer]
 }
 
 resource "azurerm_key_vault_secret" "sql_database" {
   name         = "sql-database"
-  value        = data.azurerm_mssql_database.shared.name
+  value        = module.sql_database.database_name
   key_vault_id = data.azurerm_key_vault.shared.id
   tags         = local.tags
+
+  depends_on = [azurerm_role_assignment.deployer_kv_secrets_officer]
 }
 
 resource "azurerm_key_vault_secret" "sql_user" {
@@ -105,11 +125,15 @@ resource "azurerm_key_vault_secret" "sql_user" {
   value        = var.sql_admin_login
   key_vault_id = data.azurerm_key_vault.shared.id
   tags         = local.tags
+
+  depends_on = [azurerm_role_assignment.deployer_kv_secrets_officer]
 }
 
 resource "azurerm_key_vault_secret" "sql_password" {
   name         = "sql-password"
-  value        = data.azurerm_key_vault_secret.sql_admin_password.value
+  value        = random_password.sql_admin.result
   key_vault_id = data.azurerm_key_vault.shared.id
   tags         = local.tags
+
+  depends_on = [azurerm_role_assignment.deployer_kv_secrets_officer]
 }
