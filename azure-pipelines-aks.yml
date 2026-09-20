@@ -10,19 +10,7 @@
 #      menos uma vez, pois este stack referencia (via data source) o ACR, o
 #      Azure SQL e o Key Vault criados por ela.
 
-trigger:
-  branches:
-    include:
-      - main
-  paths:
-    include:
-      - src/*
-      - public/*
-      - infra/terraform/aks/*
-      - infra/k8s/*
-      - Dockerfile
-      - package.json
-      - azure-pipelines-aks.yml
+trigger: none
 
 pr: none
 
@@ -264,5 +252,13 @@ stages:
                 kubectl apply -f "$workDir/deployment.yaml"
                 kubectl apply -f "$workDir/service.yaml"
 
-                kubectl -n "$(k8sNamespace)" rollout status deployment/azure-shop --timeout=180s
+                if ! kubectl -n "$(k8sNamespace)" rollout status deployment/azure-shop --timeout=180s; then
+                  echo "Diagnostico do rollout do AzureShop"
+                  kubectl -n "$(k8sNamespace)" get pods -o wide || true
+                  kubectl -n "$(k8sNamespace)" describe deployment azure-shop || true
+                  kubectl -n "$(k8sNamespace)" describe pods -l app=azure-shop || true
+                  kubectl -n "$(k8sNamespace)" get events --sort-by=.lastTimestamp || true
+                  kubectl -n "$(k8sNamespace)" logs -l app=azure-shop --all-containers --prefix --tail=200 || true
+                  exit 1
+                fi
                 kubectl -n "$(k8sNamespace)" get service azure-shop
