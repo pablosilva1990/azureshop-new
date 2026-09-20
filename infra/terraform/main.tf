@@ -1,7 +1,7 @@
 locals {
   tags = {
-    project       = "azureshop"
-    company      = "highexpert"
+    project = "azureshop"
+    company = "highexpert"
     managed = "terraform"
   }
 

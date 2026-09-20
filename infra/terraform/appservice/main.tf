@@ -98,12 +98,12 @@ module "app_service" {
   docker_image_name = var.docker_image_name
   docker_image_tag  = var.docker_image_tag
 
-  db_provider         = "sqlserver"
-  sql_server_fqdn     = module.sql_database.server_fqdn
-  sql_database_name   = module.sql_database.database_name
-  sql_admin_login     = var.sql_admin_login
-  sql_admin_password  = random_password.sql_admin.result
-  ai_enabled          = var.ai_enabled
+  db_provider        = "sqlserver"
+  sql_server_fqdn    = module.sql_database.server_fqdn
+  sql_database_name  = module.sql_database.database_name
+  sql_admin_login    = var.sql_admin_login
+  sql_admin_password = random_password.sql_admin.result
+  ai_enabled         = var.ai_enabled
 
   app_insights_connection_string = module.monitoring.app_insights_connection_string
 }

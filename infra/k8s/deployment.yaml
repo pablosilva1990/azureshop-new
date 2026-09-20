@@ -62,19 +62,17 @@ spec:
               mountPath: /app/data
             - name: tmp
               mountPath: /tmp
-          # Monte o Key Vault via CSI descomentando abaixo (etapa de seguranca).
-          # volumeMounts:
-          #   - name: kv-secrets
-          #     mountPath: /mnt/secrets-store
-          #     readOnly: true
+            - name: kv-secrets
+              mountPath: /mnt/secrets-store
+              readOnly: true
       volumes:
         - name: data
           emptyDir: {}
         - name: tmp
           emptyDir: {}
-      #   - name: kv-secrets
-      #     csi:
-      #       driver: secrets-store.csi.k8s.io
-      #       readOnly: true
-      #       volumeAttributes:
-      #         secretProviderClass: azure-shop-kv
+        - name: kv-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-shop-kv
