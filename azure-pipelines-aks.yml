@@ -74,6 +74,7 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 set -euo pipefail
+                az upgrade --yes --only-show-errors
                 az group create \
                   --name "$(tfStateResourceGroup)" \
                   --location "$(location)" \
@@ -159,6 +160,7 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 set -euo pipefail
+                az upgrade --yes --only-show-errors
                 cd "$(terraformWorkingDirectory)"
 
                 aksName=$(terraform output -raw aks_name)
@@ -204,6 +206,7 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 set -euo pipefail
+                az upgrade --yes --only-show-errors
                 az acr build \
                   --registry "$(acrName)" \
                   --image "$(dockerImageName):$(Build.BuildId)" \
@@ -232,6 +235,7 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 set -euo pipefail
+                az upgrade --yes --only-show-errors
 
                 az aks install-cli --only-show-errors || true
                 az aks get-credentials \
