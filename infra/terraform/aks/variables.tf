@@ -35,7 +35,7 @@ variable "aks_node_count" {
 variable "aks_node_size" {
   description = "SKU do node pool padrao. Confirme cota disponivel na regiao antes de mudar."
   type        = string
-  default     = "Standard_D2s_v5"
+  default     = "Standard_D4s_v5"
 }
 
 # --- Recursos EXISTENTES, criados pelo stack infra/terraform/appservice, ---
