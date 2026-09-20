@@ -44,6 +44,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     name                        = "system"
     node_count                  = var.node_count
     vm_size                     = var.node_size
+    max_pods                    = 50
     temporary_name_for_rotation = "temp"
     # Uma zona apenas para reduzir custo em laboratorio.
   }
