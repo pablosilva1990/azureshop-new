@@ -1,0 +1,64 @@
+# Aplica infra/sql/schema.sql no Azure SQL de dentro do cluster. O SQL so aceita
+# acesso privado (Private Endpoint), entao o agente da pipeline nao alcanca o
+# banco; os pods do AKS sim. Credenciais vem do Key Vault via CSI driver e o
+# schema vem do ConfigMap azure-shop-schema (criado pela pipeline a partir do
+# arquivo, para nao duplicar o SQL). O schema e idempotente.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: azure-shop-schema
+  namespace: azure-shop
+  labels:
+    app: azure-shop-schema
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: azure-shop-schema
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: sqlcmd
+          image: mcr.microsoft.com/mssql-tools:latest
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              export SQLCMDPASSWORD="$(cat /mnt/secrets-store/sql-password)"
+              /opt/mssql-tools/bin/sqlcmd \
+                -S "$(cat /mnt/secrets-store/sql-server)" \
+                -d "$(cat /mnt/secrets-store/sql-database)" \
+                -U "$(cat /mnt/secrets-store/sql-user)" \
+                -l 60 -b -f 65001 \
+                -i /schema/schema.sql
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi }
+          volumeMounts:
+            - name: schema
+              mountPath: /schema
+              readOnly: true
+            - name: kv-secrets
+              mountPath: /mnt/secrets-store
+              readOnly: true
+      volumes:
+        - name: schema
+          configMap:
+            name: azure-shop-schema
+        - name: kv-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-shop-kv
