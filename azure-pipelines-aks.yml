@@ -153,7 +153,7 @@ stages:
 
           - task: AzureCLI@2
             name: tfOutputs
-            displayName: 'Publicar outputs do Terraform e aplicar schema do Azure SQL'
+            displayName: 'Publicar outputs do Terraform'
             inputs:
               azureSubscription: '$(azureServiceConnection)'
               scriptType: bash
@@ -168,29 +168,12 @@ stages:
                 acrLoginServer=$(terraform output -raw acr_login_server)
                 keyVaultSecretsProviderClientId=$(terraform output -raw key_vault_secrets_provider_client_id)
                 tenantId=$(terraform output -raw tenant_id)
-                sqlServerFqdn=$(terraform output -raw sql_server_fqdn)
-                sqlDatabaseNameOut=$(terraform output -raw sql_database_name)
 
                 echo "##vso[task.setvariable variable=aksName;isOutput=true]$aksName"
                 echo "##vso[task.setvariable variable=aksResourceGroupName;isOutput=true]$aksResourceGroupName"
                 echo "##vso[task.setvariable variable=acrLoginServer;isOutput=true]$acrLoginServer"
                 echo "##vso[task.setvariable variable=keyVaultSecretsProviderClientId;isOutput=true]$keyVaultSecretsProviderClientId"
                 echo "##vso[task.setvariable variable=tenantId;isOutput=true]$tenantId"
-
-                # Variaveis de shell locais (nao macros $(...) do Pipelines) evitam que o
-                # bash tente executa-las como command substitution antes da expansao do Azure DevOps.
-                if ! command -v sqlcmd >/dev/null 2>&1; then
-                  curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-                  curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list >/dev/null
-                  sudo apt-get update -y
-                  sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
-                fi
-                export PATH="$PATH:/opt/mssql-tools18/bin"
-
-                sqlPassword=$(az keyvault secret show --vault-name "$(keyVaultName)" --name sql-password --query value -o tsv)
-
-                sqlcmd -S "$sqlServerFqdn" -d "$sqlDatabaseNameOut" -U "$(sqlAdminLogin)" -P "$sqlPassword" -C \
-                  -i "$(System.DefaultWorkingDirectory)/infra/sql/schema.sql"
 
   - stage: BuildAndPush
     displayName: 'Build da imagem (ACR Tasks)'
@@ -253,6 +236,23 @@ stages:
                 kubectl apply -f "$workDir/namespace.yaml"
                 kubectl apply -f "$workDir/configmap.yaml"
                 kubectl apply -f "$workDir/secretproviderclass.yaml"
+
+                # O Azure SQL so aceita acesso privado (Private Endpoint): o agente da pipeline
+                # nao o alcanca, entao o schema e aplicado por um Job dentro do cluster.
+                kubectl -n "$(k8sNamespace)" create configmap azure-shop-schema \
+                  --from-file=schema.sql="$(System.DefaultWorkingDirectory)/infra/sql/schema.sql" \
+                  --dry-run=client -o yaml | kubectl apply -f -
+                kubectl -n "$(k8sNamespace)" delete job azure-shop-schema --ignore-not-found
+                kubectl apply -f "$manifestsDir/schema-job.yaml"
+                if ! kubectl -n "$(k8sNamespace)" wait --for=condition=complete job/azure-shop-schema --timeout=300s; then
+                  echo "Falha ao aplicar o schema do Azure SQL"
+                  kubectl -n "$(k8sNamespace)" describe job azure-shop-schema || true
+                  kubectl -n "$(k8sNamespace)" describe pods -l app=azure-shop-schema || true
+                  kubectl -n "$(k8sNamespace)" logs -l app=azure-shop-schema --all-containers --tail=100 || true
+                  exit 1
+                fi
+                kubectl -n "$(k8sNamespace)" logs -l app=azure-shop-schema --tail=50 || true
+
                 kubectl apply -f "$workDir/deployment.yaml"
                 kubectl apply -f "$workDir/service.yaml"
 
