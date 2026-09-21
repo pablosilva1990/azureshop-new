@@ -120,12 +120,6 @@ resource "azurerm_role_assignment" "deployer_kv_secrets_officer" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
-import {
-  to = azurerm_role_assignment.deployer_kv_secrets_officer
-
-  id = "/subscriptions/2f3dffd8-ca86-420b-b29d-312976016694/resourceGroups/rg-azureshop-shop01/providers/Microsoft.KeyVault/vaults/kv-azshop2-shop01/providers/Microsoft.Authorization/roleAssignments/31401bcd-4555-bb4e-bad4-9a388dad742e"
-}
-
 # Espelha no Key Vault compartilhado os valores no formato esperado pelo
 # SecretProviderClass (infra/k8s/secretproviderclass.yaml), apontando para o
 # Azure SQL dedicado do AKS.
