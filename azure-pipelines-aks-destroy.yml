@@ -1,0 +1,133 @@
+# Pipeline MANUAL para DESTRUIR o ambiente AKS criado por azure-pipelines-aks.yml.
+# Le o tfstate remoto (mesma Storage Account/container/key da pipeline de criacao)
+# e executa terraform destroy do stack infra/terraform/aks.
+#
+# Destroi: Resource Group do AKS, AKS, Azure SQL (+ Private Endpoint e zona DNS
+# privada), Log Analytics e os secrets sql-* gravados no Key Vault compartilhado.
+# NAO destroi: ACR, Key Vault e Resource Group compartilhados (stack App Service)
+# e a Storage Account do tfstate.
+#
+# Uso: Run pipeline e informe DESTROY no parametro 'confirmDestroy'.
+# Qualquer outro valor aborta antes de tocar em qualquer recurso.
+
+trigger: none
+
+pr: none
+
+parameters:
+  - name: confirmDestroy
+    displayName: "Digite DESTROY para confirmar a destruicao do ambiente AKS"
+    type: string
+    default: 'NAO'
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  azureServiceConnection: 'DEvops-Estudos'
+
+  # Devem ser IGUAIS aos da pipeline azure-pipelines-aks.yml.
+  suffix: 'aks01'
+  location: 'westus3'
+  sharedResourceGroupName: 'rg-azureshop-shop01'
+  acrName: 'acrazureshopshop01'
+  keyVaultName: 'kv-azshop2-shop01'
+  sqlDatabaseName: 'azureshop'
+  sqlAdminLogin: 'azureshopadmin'
+
+  terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)/infra/terraform/aks'
+  terraformVersion: '1.9.5'
+
+  # Mesmo backend remoto da pipeline de criacao.
+  tfStateResourceGroup: 'rg-azureshop-tfstate'
+  tfStateStorageAccount: 'sttfstateshop01'
+  tfStateContainer: 'tfstate'
+  tfStateKey: 'azureshop-aks.tfstate'
+
+  aksResourceGroupName: 'rg-azureshop-aks-$(suffix)'
+
+stages:
+  - stage: Destroy
+    displayName: 'Destruir ambiente AKS (Terraform)'
+    jobs:
+      - job: TerraformDestroy
+        displayName: 'terraform init/plan -destroy/destroy'
+        steps:
+          - script: |
+              if [ "${{ parameters.confirmDestroy }}" != "DESTROY" ]; then
+                echo "##vso[task.logissue type=error]Confirmacao invalida. Rode novamente informando DESTROY em 'confirmDestroy'."
+                exit 1
+              fi
+            displayName: 'Validar confirmacao'
+
+          - task: TerraformInstaller@1
+            displayName: 'Instalar Terraform'
+            inputs:
+              terraformVersion: '$(terraformVersion)'
+
+          - task: TerraformTaskV4@4
+            displayName: 'terraform init (state remoto)'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(terraformWorkingDirectory)'
+              backendServiceArm: '$(azureServiceConnection)'
+              backendAzureRmResourceGroupName: '$(tfStateResourceGroup)'
+              backendAzureRmStorageAccountName: '$(tfStateStorageAccount)'
+              backendAzureRmContainerName: '$(tfStateContainer)'
+              backendAzureRmKey: '$(tfStateKey)'
+
+          # Private Endpoints criados fora do Terraform (ex.: pelo portal) ficam presos
+          # na subnet da VNet gerenciada do AKS e travam a exclusao do cluster. Remove
+          # os que existirem no RG do AKS antes do destroy; os geridos pelo Terraform
+          # tambem saem aqui e o destroy apenas os reconhece como ja removidos.
+          - task: AzureCLI@2
+            displayName: 'Remover Private Endpoints do RG do AKS'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                if [ "$(az group exists --name "$(aksResourceGroupName)")" != "true" ]; then
+                  echo "RG $(aksResourceGroupName) nao existe; nada a limpar."
+                  exit 0
+                fi
+                for pe in $(az network private-endpoint list --resource-group "$(aksResourceGroupName)" --query "[].name" -o tsv); do
+                  echo "Removendo private endpoint $pe"
+                  az network private-endpoint delete --resource-group "$(aksResourceGroupName)" --name "$pe"
+                done
+
+          - task: TerraformTaskV4@4
+            displayName: 'terraform plan -destroy'
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: '$(terraformWorkingDirectory)'
+              environmentServiceNameAzureRM: '$(azureServiceConnection)'
+              commandOptions: >
+                -destroy
+                -var="suffix=$(suffix)"
+                -var="location=$(location)"
+                -var="shared_resource_group_name=$(sharedResourceGroupName)"
+                -var="acr_name=$(acrName)"
+                -var="sql_database_name=$(sqlDatabaseName)"
+                -var="sql_admin_login=$(sqlAdminLogin)"
+                -var="key_vault_name=$(keyVaultName)"
+
+          - task: TerraformTaskV4@4
+            displayName: 'terraform destroy'
+            inputs:
+              provider: 'azurerm'
+              command: 'destroy'
+              workingDirectory: '$(terraformWorkingDirectory)'
+              environmentServiceNameAzureRM: '$(azureServiceConnection)'
+              commandOptions: >
+                -auto-approve
+                -var="suffix=$(suffix)"
+                -var="location=$(location)"
+                -var="shared_resource_group_name=$(sharedResourceGroupName)"
+                -var="acr_name=$(acrName)"
+                -var="sql_database_name=$(sqlDatabaseName)"
+                -var="sql_admin_login=$(sqlAdminLogin)"
+                -var="key_vault_name=$(keyVaultName)"
