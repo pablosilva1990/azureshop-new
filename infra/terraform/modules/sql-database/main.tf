@@ -41,6 +41,11 @@ variable "aks_vnet_id" {
   type    = string
   default = ""
 }
+variable "link_aks_vnet" {
+  description = "Vincula a zona DNS privada a aks_vnet_id. Flag booleana separada porque aks_vnet_id pode ser desconhecido no plan (VNet gerenciada criada junto com o AKS) e nao pode ser usada em count."
+  type        = bool
+  default     = false
+}
 variable "enable_private_endpoint" {
   type    = bool
   default = false
@@ -139,7 +144,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "vnet" {
 # Vincula a mesma Zona DNS Privada a VNet gerenciada do AKS (via peering),
 # para que os pods resolvam o FQDN do SQL para o IP privado.
 resource "azurerm_private_dns_zone_virtual_network_link" "aks" {
-  count                 = var.enable_private_endpoint && var.aks_vnet_id != "" ? 1 : 0
+  count                 = var.enable_private_endpoint && var.link_aks_vnet ? 1 : 0
   name                  = "link-aks-vnet"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.sql[0].name

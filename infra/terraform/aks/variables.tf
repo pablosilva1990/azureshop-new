@@ -88,6 +88,12 @@ variable "sql_public_network_access" {
   default     = false
 }
 
+variable "sql_enable_private_endpoint" {
+  description = "Cria Private Endpoint + zona DNS privada do Azure SQL na VNet do AKS. Necessario quando sql_public_network_access = false."
+  type        = bool
+  default     = true
+}
+
 variable "key_vault_name" {
   description = "Nome do Key Vault existente onde a senha do SQL ja esta armazenada (secret 'sql-admin-password')."
   type        = string

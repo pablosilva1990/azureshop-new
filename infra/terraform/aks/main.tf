@@ -43,6 +43,19 @@ resource "random_password" "sql_admin" {
   override_special = "-_=+"
 }
 
+# VNet gerenciada do AKS (criada pelo proprio AKS no node resource group, MC_*).
+# O Private Endpoint do SQL fica na subnet dela ("aks-subnet"), assim os pods
+# alcancam o banco por IP privado sem VNet peering nem mudanca no cluster.
+data "azurerm_resources" "aks_vnet" {
+  resource_group_name = module.aks.node_resource_group
+  type                = "Microsoft.Network/virtualNetworks"
+}
+
+locals {
+  aks_vnet_id   = one(data.azurerm_resources.aks_vnet.resources).id
+  aks_subnet_id = "${local.aks_vnet_id}/subnets/aks-subnet"
+}
+
 module "sql_database" {
   source              = "../modules/sql-database"
   resource_group_name = azurerm_resource_group.this.name
@@ -56,6 +69,13 @@ module "sql_database" {
 
   allow_azure_services  = var.allow_azure_services
   public_network_access = var.sql_public_network_access
+
+  # Private Link: Private Endpoint + zona privatelink.database.windows.net
+  # ligada a VNet do AKS, para os pods resolverem o FQDN para o IP privado.
+  enable_private_endpoint = var.sql_enable_private_endpoint
+  subnet_id               = local.aks_subnet_id
+  aks_vnet_id             = local.aks_vnet_id
+  link_aks_vnet           = true
 }
 
 module "monitoring" {
