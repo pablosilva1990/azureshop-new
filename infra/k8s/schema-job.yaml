@@ -19,9 +19,9 @@ spec:
         app: azure-shop-schema
     spec:
       restartPolicy: Never
+      # Sem runAsNonRoot/runAsUser: o ODBC Driver 13 da imagem mssql-tools falha
+      # (SQLAllocHandle on SQL_HANDLE_HENV) quando roda como usuario nao-root.
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -38,7 +38,7 @@ spec:
                 -S "$(cat /mnt/secrets-store/sql-server)" \
                 -d "$(cat /mnt/secrets-store/sql-database)" \
                 -U "$(cat /mnt/secrets-store/sql-user)" \
-                -l 60 -b \
+                -l 60 -b -I \
                 -i /schema/schema.sql
           securityContext:
             allowPrivilegeEscalation: false
