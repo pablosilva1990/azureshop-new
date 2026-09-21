@@ -31,12 +31,14 @@ spec:
           args:
             - |
               set -euo pipefail
+              # sqlcmd 17 no Linux nao tem -f; le o arquivo conforme o locale (UTF-8).
+              export LC_ALL=C.UTF-8
               export SQLCMDPASSWORD="$(cat /mnt/secrets-store/sql-password)"
               /opt/mssql-tools/bin/sqlcmd \
                 -S "$(cat /mnt/secrets-store/sql-server)" \
                 -d "$(cat /mnt/secrets-store/sql-database)" \
                 -U "$(cat /mnt/secrets-store/sql-user)" \
-                -l 60 -b -f 65001 \
+                -l 60 -b \
                 -i /schema/schema.sql
           securityContext:
             allowPrivilegeEscalation: false
